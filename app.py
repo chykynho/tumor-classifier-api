@@ -7,23 +7,43 @@ import os
 
 app = Flask(__name__)
 
-# Carrega o modelo treinado(assumindo que o modelo foi salvo como 'modelo_tumor.h5')
+# Carrega o modelo treinado
 model = load_model('modelo_tumor.h5')
 
-# Classes (ajuste conforme seu dataset)
-categories = ['glioma' 'meningioma', 'notumor', ['pituitary']]
+# ✅ CORRIGIDO: Lista de categorias com vírgulas corretas
+categories = ['glioma', 'meningioma', 'notumor', 'pituitary']  # ← removido o [] errado em pituitary
 
-# Função para pré-processar a imagem
+# ✅ Descobre automaticamente o tamanho de entrada do modelo
+IMG_HEIGHT, IMG_WIDTH = model.input_shape[1:3]  # Ex: (150, 150)
+INPUT_CHANNELS = model.input_shape[3]  # 1 para escala de cinza, 3 para RGB
+
 def preprocess_image(image_file):
-    # Lê a imagem
+    # Lê a imagem como bytes
     file_bytes = np.frombuffer(image_file.read(), np.uint8)
-    img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
-    # Redimensiona para o tamanho esperado pelo modelo (ex:224x224)
-    img = cv2.resize(img, (224,224))
-    # Normaliza
-    img = img.astye('float32')/225.0
-    # Expande dimensão para batch (1,224,224,3)
-    img = np.expand_dims(img, axis=0)
+    img = cv2.imdecode(file_bytes, cv2.IMREAD_UNCHANGED)
+
+    if img is None:
+        raise ValueError("Imagem inválida ou corrompida")
+
+    # ✅ Converte para escala de cinza se o modelo espera 1 canal
+    if INPUT_CHANNELS == 1 and len(img.shape) == 3:
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    elif INPUT_CHANNELS == 3 and len(img.shape) == 2:
+        img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+
+    # ✅ Redimensiona para o tamanho que o modelo espera
+    img = cv2.resize(img, (IMG_WIDTH, IMG_HEIGHT))
+
+    # ✅ Normaliza entre 0 e 1 (dividindo por 255, não 225!)
+    img = img.astype('float32') / 255.0
+
+    # ✅ Adiciona canal se necessário (para escala de cinza)
+    if INPUT_CHANNELS == 1 and len(img.shape) == 2:
+        img = np.expand_dims(img, axis=-1)  # (H, W) → (H, W, 1)
+
+    # ✅ Adiciona dimensão de batch
+    img = np.expand_dims(img, axis=0)  # (1, H, W, C)
+
     return img
 
 @app.route('/')
@@ -46,17 +66,21 @@ def predict():
         # Faz a predição
         predictions = model.predict(img)
         predicted_class_idx = np.argmax(predictions[0])
-        predict_class = categories[predicted_class_idx]
+        predicted_class = categories[predicted_class_idx]
         confidence = float(predictions[0][predicted_class_idx])
 
+        # ✅ Retorna todas as probabilidades por categoria
+        probabilities = {cat: float(prob) for cat, prob in zip(categories, predictions[0])}
+
         return jsonify({
-            'class_predita': predict_class,
+            'classe_predita': predicted_class,
             'confianca': confidence,
-            'probabilidades': {cat: float(prob) for cat, prob in zip(categories, predictions[0])}
+            'probabilidades': probabilities
         })
     
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-    
+
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)  # ← debug=False em produção!
