@@ -4,6 +4,12 @@ import cv2
 import tensorflow as tf
 from tensorflow.keras.models import load_model
 import os
+import secrets
+
+# Gera um token aleatório na primeira execução
+API_TOKEN = os.getenv('API_TOKEN', secrets.token_urlsafe(32))
+print(f"✅ Seu token de acesso é: {API_TOKEN}")  # Apenas para debug — remova em produção!
+
 
 app = Flask(__name__)
 
@@ -52,6 +58,11 @@ def home():
 
 @app.route('/predict', methods=['POST'])
 def predict():
+    # Verifica token
+    token = request.headers.get('Authorization')
+    if not token or token != f"Bearer {API_TOKEN}":
+        return jsonify({'error': 'Token de acesso inválido ou ausente'}), 401
+
     if 'image' not in request.files:
         return jsonify({'error': 'Nenhuma imagem enviada'}), 400
     
