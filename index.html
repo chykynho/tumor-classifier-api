@@ -43,6 +43,9 @@
             try {
                 const response = await fetch('https://tumor-classifier-api.onrender.com/predict', {
                     method: 'POST',
+                    headers:{
+                        'Authorization': 'zandor999'
+                    },
                     body: formData
                 });
 
