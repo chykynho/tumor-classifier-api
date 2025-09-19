@@ -1,9 +1,11 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS # Resolver "Erro na requisição: Failed to fetch" no browser
 import numpy as np
 import cv2
 import tensorflow as tf
 from tensorflow.keras.models import load_model
 import os
+
 # import secrets
 
 # Gera um token aleatório na primeira execução
@@ -12,6 +14,10 @@ import os
 
 
 app = Flask(__name__)
+# Para utilizar na produção como controle de acesso
+# CORS(app, origins=["https://seusite.com", "http://localhost:3000"])
+#permite requisições de qualquer origem (só para desenvolvimento!)
+CORS(app)
 
 # Carrega o modelo treinado
 model = load_model('modelo_tumor.h5')
